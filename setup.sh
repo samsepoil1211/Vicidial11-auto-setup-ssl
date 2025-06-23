@@ -1,32 +1,59 @@
 #!/bin/bash
 
-# Ask for domain
-read -p "Enter your VICIdial domain (e.g., vici3.viciant.online): " DOMAIN
+echo "=== VICIdial SSL Auto Setup ==="
 
-# Ask for dialer IP
-read -p "Enter the Dialer IP (e.g., 10.0.0.10): " DIALER_IP
+# 1. Ask for domain and IP
+read -p "Enter your VICIdial domain (e.g., demo1211.beltalk.live): " DOMAIN
+read -p "Enter your Dialer Public IP (e.g., 10.7.2.208): " DIALER_IP
 
-# Auto-detect the first .crt and .key files in the directories
-SSL_CRT=$(ls /etc/apache2/ssl.crt/*.crt 2>/dev/null | head -n1)
-SSL_KEY=$(ls /etc/apache2/ssl.key/*.key 2>/dev/null | head -n1)
+# 2. Set SSL cert and key paths
+SSL_CRT="/etc/apache2/ssl.crt/star_beltalk_live.crt"
+SSL_KEY="/etc/apache2/ssl.key/_.beltalk.live.key"
 
-if [[ -z "$SSL_CRT" || -z "$SSL_KEY" ]]; then
-  echo "Error: SSL certificate or key not found in expected directories."
+# 3. Validate SSL files
+if [[ ! -s "$SSL_CRT" || ! -s "$SSL_KEY" ]]; then
+  echo "❌ SSL cert or key file is missing or empty!"
+  echo "Expected:"
+  echo "  - $SSL_CRT"
+  echo "  - $SSL_KEY"
   exit 1
 fi
 
-# Extract filenames only
 CRT_FILE=$(basename "$SSL_CRT")
 KEY_FILE=$(basename "$SSL_KEY")
 
-# 1. Update /etc/hosts
-echo "$DIALER_IP $DOMAIN" >> /etc/hosts
+# 4. Update /etc/hosts
+# Remove any existing line with this domain or dialer IP
+sed -i "/[[:space:]]$DOMAIN$/d" /etc/hosts
+sed -i "/^$DIALER_IP[[:space:]]/d" /etc/hosts
 
-# 2. Update /etc/hostname
+# Insert just below 127.0.0.1 line
+if grep -q "^127.0.0.1" /etc/hosts; then
+  awk -v ip="$DIALER_IP" -v domain="$DOMAIN" '
+    /^127.0.0.1/ {
+      print $0
+      print ip, domain
+      next
+    }
+    { print }
+  ' /etc/hosts > /tmp/hosts.tmp && mv /tmp/hosts.tmp /etc/hosts
+  echo "✅ Inserted $DIALER_IP $DOMAIN just below 127.0.0.1 in /etc/hosts"
+else
+  echo "127.0.0.1 localhost" >> /etc/hosts
+  echo "$DIALER_IP $DOMAIN" >> /etc/hosts
+  echo "✅ Added loopback and domain to /etc/hosts"
+fi
+
+# 5. Update /etc/hostname
 echo "$DOMAIN" > /etc/hostname
+echo "✅ Set hostname to $DOMAIN"
 
-# 3. Edit /etc/apache2/default-server.conf
-cat <<EOF >> /etc/apache2/default-server.conf
+# 6. Update default-server.conf
+DEF_CONF="/etc/apache2/default-server.conf"
+if grep -q "$DOMAIN" "$DEF_CONF"; then
+  echo "✅ default-server.conf already configured"
+else
+  cat <<EOF >> "$DEF_CONF"
 
 # Secure redirect
 <VirtualHost *:80>
@@ -41,38 +68,68 @@ cat <<EOF >> /etc/apache2/default-server.conf
    SSLEngine On
 </VirtualHost>
 EOF
-
-# 4. Edit vhosts.d/0000-*-default-ssl.conf
-SSL_CONF=$(find /etc/apache2/vhosts.d/ -name "0000-*-default-ssl.conf" | head -n1)
-if [[ -n "$SSL_CONF" ]]; then
-  sed -i "/SSLEngine On/a SSLCertificateFile /etc/apache2/ssl.crt/$CRT_FILE\nSSLCertificateKeyFile /etc/apache2/ssl.key/$KEY_FILE" "$SSL_CONF"
+  echo "✅ Appended HTTPS redirect to $DEF_CONF"
 fi
 
-# 5. Edit /etc/apache2/ssl-global.conf
-sed -i "/#.*SSLCertificateFile.*/a SSLCertificateFile /etc/apache2/ssl.crt/$CRT_FILE\nSSLCertificateKeyFile /etc/apache2/ssl.key/$KEY_FILE" /etc/apache2/ssl-global.conf
+# 7. Update all vhosts in /etc/apache2/vhosts.d/
+for vhost in /etc/apache2/vhosts.d/*.conf; do
+  if grep -q "SSLCertificateFile" "$vhost"; then
+    sed -i "s|^.*SSLCertificateFile.*|SSLCertificateFile /etc/apache2/ssl.crt/$CRT_FILE|" "$vhost"
+    echo "✅ Patched SSLCertificateFile in $vhost"
+  fi
+  if grep -q "SSLCertificateKeyFile" "$vhost"; then
+    sed -i "s|^.*SSLCertificateKeyFile.*|SSLCertificateKeyFile /etc/apache2/ssl.key/$KEY_FILE|" "$vhost"
+    echo "✅ Patched SSLCertificateKeyFile in $vhost"
+  fi
+done
 
-# 6. Configure Asterisk http.conf (ONLY TLS settings)
-AST_HTTP_CONF="/etc/asterisk/http.conf"
+# 8. Patch ssl-global.conf
+GLOBAL_CONF="/etc/apache2/ssl-global.conf"
+if grep -q "$CRT_FILE" "$GLOBAL_CONF"; then
+  echo "✅ ssl-global.conf already configured"
+else
+  sed -i "/#.*SSLCertificateFile.*/a SSLCertificateFile /etc/apache2/ssl.crt/$CRT_FILE\nSSLCertificateKeyFile /etc/apache2/ssl.key/$KEY_FILE" "$GLOBAL_CONF"
+  echo "✅ Patched $GLOBAL_CONF with cert and key"
+fi
 
-# Ensure lines exist or append them
-grep -q '^tlsbindaddr=' "$AST_HTTP_CONF" && \
-  sed -i "s|^tlsbindaddr=.*|tlsbindaddr=$DIALER_IP:8089|" "$AST_HTTP_CONF" || \
-  echo "tlsbindaddr=$DIALER_IP:8089" >> "$AST_HTTP_CONF"
+# 9. Modify Asterisk http.conf (replace, do not append)
+AST_HTTP="/etc/asterisk/http.conf"
 
-grep -q '^tlscertfile=' "$AST_HTTP_CONF" && \
-  sed -i "s|^tlscertfile=.*|tlscertfile=/etc/apache2/ssl.crt/$CRT_FILE|" "$AST_HTTP_CONF" || \
-  echo "tlscertfile=/etc/apache2/ssl.crt/$CRT_FILE" >> "$AST_HTTP_CONF"
+# Replace or uncomment tlsbindaddr line with correct IP
+if grep -q "^;*tlsbindaddr=" "$AST_HTTP"; then
+  sed -i "s|^;*tlsbindaddr=.*|tlsbindaddr=$DIALER_IP:8089|" "$AST_HTTP"
+  echo "✅ Replaced tlsbindaddr in $AST_HTTP"
+else
+  echo "⚠️ tlsbindaddr not found in $AST_HTTP — add manually if needed"
+fi
 
-grep -q '^tlsprivatekey=' "$AST_HTTP_CONF" && \
-  sed -i "s|^tlsprivatekey=.*|tlsprivatekey=/etc/apache2/ssl.key/$KEY_FILE|" "$AST_HTTP_CONF" || \
-  echo "tlsprivatekey=/etc/apache2/ssl.key/$KEY_FILE" >> "$AST_HTTP_CONF"
+# Replace or uncomment tlscertfile
+if grep -q "^;*tlscertfile=" "$AST_HTTP"; then
+  sed -i "s|^;*tlscertfile=.*|tlscertfile=/etc/apache2/ssl.crt/$CRT_FILE|" "$AST_HTTP"
+  echo "✅ Replaced tlscertfile in $AST_HTTP"
+fi
 
-# 7. Restart Services
-echo "Restarting Apache and HTTPD services..."
-systemctl restart apache2
-systemctl status apache2 --no-pager
+# Replace or uncomment tlsprivatekey
+if grep -q "^;*tlsprivatekey=" "$AST_HTTP"; then
+  sed -i "s|^;*tlsprivatekey=.*|tlsprivatekey=/etc/apache2/ssl.key/$KEY_FILE|" "$AST_HTTP"
+  echo "✅ Replaced tlsprivatekey in $AST_HTTP"
+fi
 
-systemctl restart httpd
-systemctl status httpd --no-pager
+# 10. Restart Apache and HTTPD
+echo "🔁 Restarting apache2..."
+systemctl restart apache2 2>/dev/null
+if [[ $? -ne 0 ]]; then
+  echo "❌ apache2 failed to restart. Run: systemctl status apache2 -l"
+else
+  echo "✅ apache2 restarted successfully."
+fi
 
-echo "✅ Configuration complete. You may now reboot the system if needed."
+echo "🔁 Restarting httpd..."
+systemctl restart httpd 2>/dev/null
+if [[ $? -ne 0 ]]; then
+  echo "❌ httpd failed to restart. Run: systemctl status httpd -l"
+else
+  echo "✅ httpd restarted successfully."
+fi
+
+echo "🎉 All configuration steps completed successfully!"
