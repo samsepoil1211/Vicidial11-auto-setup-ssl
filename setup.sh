@@ -4,7 +4,7 @@ echo "=== VICIdial SSL Auto Setup ==="
 
 # 1. Ask for domain and IP
 read -p "Enter your VICIdial domain (e.g., demo1211.beltalk.live): " DOMAIN
-read -p "Enter your Dialer Public IP (e.g., 10.7.2.208): " DIALER_IP
+read -p "Enter your Dialer Public IP : " DIALER_IP
 
 # 2. Set SSL cert and key paths
 SSL_CRT="/etc/apache2/ssl.crt/star_beltalk_live.crt"
