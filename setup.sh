@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "=== VICIdial SSL Auto Setup ==="
+echo "=== VICIdial SSL Auto Setup by Debjit ==="
 
 # 1. Ask for domain and IP
 read -p "Enter your VICIdial domain (e.g., demo1211.beltalk.live): " DOMAIN
@@ -132,4 +132,4 @@ else
   echo "✅ httpd restarted successfully."
 fi
 
-echo "🎉 All configuration steps completed successfully!"
+echo "🎉 All configuration steps completed successfully. You may reboot the server now!"
