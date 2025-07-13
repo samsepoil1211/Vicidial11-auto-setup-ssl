@@ -23,11 +23,9 @@ CRT_FILE=$(basename "$SSL_CRT")
 KEY_FILE=$(basename "$SSL_KEY")
 
 # 4. Update /etc/hosts
-# Remove any existing line with this domain or dialer IP
 sed -i "/[[:space:]]$DOMAIN$/d" /etc/hosts
 sed -i "/^$DIALER_IP[[:space:]]/d" /etc/hosts
 
-# Insert just below 127.0.0.1 line
 if grep -q "^127.0.0.1" /etc/hosts; then
   awk -v ip="$DIALER_IP" -v domain="$DOMAIN" '
     /^127.0.0.1/ {
@@ -92,10 +90,9 @@ else
   echo "✅ Patched $GLOBAL_CONF with cert and key"
 fi
 
-# 9. Modify Asterisk http.conf (replace, do not append)
+# 9. Modify Asterisk http.conf
 AST_HTTP="/etc/asterisk/http.conf"
 
-# Replace or uncomment tlsbindaddr line with correct IP
 if grep -q "^;*tlsbindaddr=" "$AST_HTTP"; then
   sed -i "s|^;*tlsbindaddr=.*|tlsbindaddr=$DIALER_IP:8089|" "$AST_HTTP"
   echo "✅ Replaced tlsbindaddr in $AST_HTTP"
@@ -103,13 +100,11 @@ else
   echo "⚠️ tlsbindaddr not found in $AST_HTTP — add manually if needed"
 fi
 
-# Replace or uncomment tlscertfile
 if grep -q "^;*tlscertfile=" "$AST_HTTP"; then
   sed -i "s|^;*tlscertfile=.*|tlscertfile=/etc/apache2/ssl.crt/$CRT_FILE|" "$AST_HTTP"
   echo "✅ Replaced tlscertfile in $AST_HTTP"
 fi
 
-# Replace or uncomment tlsprivatekey
 if grep -q "^;*tlsprivatekey=" "$AST_HTTP"; then
   sed -i "s|^;*tlsprivatekey=.*|tlsprivatekey=/etc/apache2/ssl.key/$KEY_FILE|" "$AST_HTTP"
   echo "✅ Replaced tlsprivatekey in $AST_HTTP"
@@ -132,4 +127,13 @@ else
   echo "✅ httpd restarted successfully."
 fi
 
-echo "🎉 All configuration steps completed successfully. You may reboot the server now!"
+echo "🎉 All configuration steps completed successfully."
+
+# 11. Reboot confirmation
+read -p "🔄 Do you want to reboot the server now? [y/N]: " REBOOT_CHOICE
+if [[ "$REBOOT_CHOICE" =~ ^[Yy]$ ]]; then
+  echo "♻️ Rebooting now..."
+  reboot
+else
+  echo "⏹️ Skipped reboot. Please reboot manually later if required."
+fi
