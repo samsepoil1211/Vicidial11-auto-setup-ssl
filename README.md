@@ -12,7 +12,7 @@ This guide walks you through the full process of enabling SSL on your VICIdial s
 <p>/etc/apache2/ssl.crt/star_beltalk_live.crt</p>
 <p>/etc/apache2/ssl.key/_.beltalk.live.key</p>  
 <hr>
-## 🔧 1. Install Git (if not already installed)
+## 🔧 1. Installation 
 
 ```bash
 zypper install git
