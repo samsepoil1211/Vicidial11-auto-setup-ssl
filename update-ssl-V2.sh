@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Configuration
-SOURCE_DIR="$HOME/wetransfer__-beltalk-live-key_2026-03-19_1144"
+SOURCE_DIR="/root/Vicidial11-auto-setup-ssl/Updated-ssl-2026"
 CRT_DEST="/etc/apache2/ssl.crt"
 KEY_DEST="/etc/apache2/ssl.key"
 
@@ -43,7 +43,7 @@ else
     echo "Warning: There was an issue reloading Apache/HTTPD."
 fi
 
-asterisk -rx "module reload httpd"
+asterisk -rx "module reload http"
 echo "Asterisk HTTPD module reloaded."
 
 echo "--- Process Complete ---"
