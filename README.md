@@ -18,7 +18,7 @@ This guide walks you through the full process of enabling SSL on your VICIdial s
 zypper install git
 cd /usr/src
 git clone https://github.com/samsepoil1211/Vicidial11-auto-setup-ssl.git
-cp ssl.crt/star_beltalk_live.crt /etc/apache2/ssl.crt/
-cp ssl.key/_.beltalk.live.key /etc/apache2/ssl.key
-chmod +x /usr/src/Vicidial11-auto-setup-ssl/setup.sh
-./usr/src/Vicidial11-auto-setup-ssl/setup.sh
+cp Updated-ssl-2026/star_beltalk_live.crt /etc/apache2/ssl.crt/
+cp Updated-ssl-2026/_.beltalk.live.key /etc/apache2/ssl.key
+chmod +x setup.sh
+./setup.sh
