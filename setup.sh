@@ -7,7 +7,7 @@ read -p "Enter your VICIdial domain (e.g., demo1211.beltalk.live): " DOMAIN
 read -p "Enter your Dialer Public IP : " DIALER_IP
 
 # 2. Set SSL cert and key paths
-SSL_CRT="/etc/apache2/ssl.crt/star_beltalk_live.crt"
+SSL_CRT="/etc/apache2/ssl.crt/fullchain.crt"
 SSL_KEY="/etc/apache2/ssl.key/_.beltalk.live.key"
 
 # 3. Validate SSL files
